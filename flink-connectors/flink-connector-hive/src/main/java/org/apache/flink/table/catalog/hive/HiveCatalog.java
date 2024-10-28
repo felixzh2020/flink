@@ -903,7 +903,8 @@ public class HiveCatalog extends AbstractCatalog {
 
         Table hiveTable = getHiveTable(tablePath);
 
-        ensurePartitionedTable(tablePath, hiveTable);
+	//创建表的时候，没记录分区信息到hive，这里通过hive判断分区，肯定不通过
+        //ensurePartitionedTable(tablePath, hiveTable);
 
         try {
             // pass -1 as max_parts to fetch all partitions
