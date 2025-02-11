@@ -104,6 +104,20 @@ public class WebOptions {
                                             code(TMP_DIR.key()))
                                     .build());
 
+    /**
+     * The config parameter defining the remote hdfs directory for uploading the job jars. If not specified only
+     * web.upload.dir is work.
+     */
+    public static final ConfigOption<String> UPLOAD_REMOTE_DIR =
+            key("web.upload.remote-dir")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "Remote hdfs directory that is used by the REST API for storing uploaded jars.")
+                                    .build());
+
     /** The config parameter defining the number of archived jobs for the JobManager. */
     public static final ConfigOption<Integer> ARCHIVE_COUNT =
             key("web.history")

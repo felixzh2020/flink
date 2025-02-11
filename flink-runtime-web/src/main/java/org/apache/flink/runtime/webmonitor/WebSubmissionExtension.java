@@ -51,6 +51,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
+import static org.apache.flink.configuration.CoreOptions.FLINK_HADOOP_CONF_DIR;
+import static org.apache.flink.configuration.WebOptions.UPLOAD_REMOTE_DIR;
+
 /** Container for the web submission handlers. */
 public class WebSubmissionExtension implements WebMonitorExtension {
 
@@ -101,6 +104,8 @@ public class WebSubmissionExtension implements WebMonitorExtension {
                                 .setPoolName("flink-jar-runner")
                                 .build());
 
+        final String jarRemoteDir = configuration.getString(UPLOAD_REMOTE_DIR);
+        String hadoopConfDir = configuration.getString(FLINK_HADOOP_CONF_DIR);
         jarUploadHandler =
                 new JarUploadHandler(
                         leaderRetriever,
@@ -108,6 +113,8 @@ public class WebSubmissionExtension implements WebMonitorExtension {
                         responseHeaders,
                         JarUploadHeaders.getInstance(),
                         jarDir,
+                        hadoopConfDir,
+                        jarRemoteDir,
                         executor);
 
         final JarListHandler jarListHandler =
@@ -139,6 +146,8 @@ public class WebSubmissionExtension implements WebMonitorExtension {
                         responseHeaders,
                         JarDeleteHeaders.getInstance(),
                         jarDir,
+                        hadoopConfDir,
+                        jarRemoteDir,
                         executor);
 
         final JarPlanHandler jarPlanHandler =

@@ -53,6 +53,8 @@ import org.apache.flink.shaded.netty4.io.netty.channel.socket.nio.NioServerSocke
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpServerCodec;
 import org.apache.flink.shaded.netty4.io.netty.handler.stream.ChunkedWriteHandler;
 
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,6 +83,9 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static org.apache.flink.configuration.CoreOptions.FLINK_HADOOP_CONF_DIR;
+import static org.apache.flink.configuration.WebOptions.UPLOAD_REMOTE_DIR;
 
 /** An abstract class for netty-based REST server endpoints. */
 public abstract class RestServerEndpoint implements RestService {
@@ -125,7 +130,9 @@ public abstract class RestServerEndpoint implements RestService {
         this.sslHandlerFactory = restConfiguration.getSslHandlerFactory();
 
         this.uploadDir = restConfiguration.getUploadDir();
-        createUploadDir(uploadDir, log, true);
+        String uploadRemoteDir = configuration.getString(UPLOAD_REMOTE_DIR);
+        String hadoopConfDir = configuration.getString(FLINK_HADOOP_CONF_DIR);
+        createUploadDir(hadoopConfDir, uploadDir, uploadRemoteDir, log, true);
 
         this.maxContentLength = restConfiguration.getMaxContentLength();
         this.responseHeaders = restConfiguration.getResponseHeaders();
@@ -580,6 +587,50 @@ public abstract class RestServerEndpoint implements RestService {
                         uploadDir);
             }
             checkAndCreateUploadDir(uploadDir, log);
+        }
+    }
+
+    /** Creates the upload dir if needed. */
+    static void createUploadDir(
+            final String hadoopConfDir, final Path uploadDir, final String uploadRemoteDir, final Logger log, final boolean initialCreation)
+            throws IOException {
+        createUploadDir(uploadDir, log, initialCreation);
+        downloadRemoteJarFiles(hadoopConfDir, uploadDir.toString(), uploadRemoteDir, log);
+    }
+
+    private static void downloadRemoteJarFiles(final String hadoopConfDir, final String uploadDir, final String uploadRemoteDir, final Logger log) {
+        FileSystem fileSystem = null;
+        try {
+            if ( uploadRemoteDir != null && !uploadRemoteDir.equals("")) {
+                org.apache.hadoop.conf.Configuration conf = new org.apache.hadoop.conf.Configuration();
+                conf.addResource(new org.apache.hadoop.fs.Path(hadoopConfDir,"core-site.xml"));
+                conf.addResource(new org.apache.hadoop.fs.Path(hadoopConfDir,"hdfs-site.xml"));
+                fileSystem = FileSystem.get(conf);
+                org.apache.hadoop.fs.Path hdfsPath = new org.apache.hadoop.fs.Path(uploadRemoteDir);
+                FileStatus[] fileStatuses = fileSystem.listStatus(hdfsPath);
+                for (FileStatus fileStatus : fileStatuses) {
+                    if (fileStatus.isFile() && fileStatus.getPath().getName().endsWith(".jar")) {
+                        org.apache.hadoop.fs.Path srcPath = fileStatus.getPath();
+                        org.apache.hadoop.fs.Path destPath = new org.apache.hadoop.fs.Path(uploadDir, srcPath.getName());
+                        fileSystem.copyToLocalFile(srcPath, destPath);
+                        log.info(String.format("Download from %s to %s ok", srcPath, destPath));
+                    } else {
+                        log.info(String.format("Skip %s is not jar", fileStatus.getPath().getName()));
+                    }
+                }
+            } else {
+                log.info("Not support web.upload.remote-dir!");
+            }
+        } catch (Exception ex) {
+            log.error(ex.getMessage(), ex);
+        } finally {
+            if (fileSystem != null) {
+                try {
+                    fileSystem.close();
+                } catch (Exception ex) {
+                    /// ignore
+                }
+            }
         }
     }
 

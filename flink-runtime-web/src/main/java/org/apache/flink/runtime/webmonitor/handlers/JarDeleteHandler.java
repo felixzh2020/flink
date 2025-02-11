@@ -30,6 +30,9 @@ import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+
 import javax.annotation.Nonnull;
 
 import java.io.IOException;
@@ -48,6 +51,8 @@ public class JarDeleteHandler
                 RestfulGateway, EmptyRequestBody, EmptyResponseBody, JarDeleteMessageParameters> {
 
     private final Path jarDir;
+    private String hadoopConfDir;
+    private String jarRemoteDir;
 
     private final Executor executor;
 
@@ -61,6 +66,23 @@ public class JarDeleteHandler
             final Executor executor) {
         super(leaderRetriever, timeout, responseHeaders, messageHeaders);
         this.jarDir = requireNonNull(jarDir);
+        this.executor = requireNonNull(executor);
+    }
+
+    public JarDeleteHandler(
+            final GatewayRetriever<? extends RestfulGateway> leaderRetriever,
+            final Time timeout,
+            final Map<String, String> responseHeaders,
+            final MessageHeaders<EmptyRequestBody, EmptyResponseBody, JarDeleteMessageParameters>
+                    messageHeaders,
+            final Path jarDir,
+            final String hadoopConfDir,
+            final String jarRemoteDir,
+            final Executor executor) {
+        super(leaderRetriever, timeout, responseHeaders, messageHeaders);
+        this.jarDir = requireNonNull(jarDir);
+        this.hadoopConfDir = hadoopConfDir;
+        this.jarRemoteDir = jarRemoteDir;
         this.executor = requireNonNull(executor);
     }
 
@@ -83,6 +105,7 @@ public class JarDeleteHandler
                     } else {
                         try {
                             Files.delete(jarToDelete);
+                            deleteRemoteJarFiles(jarId);
                             return EmptyResponseBody.getInstance();
                         } catch (final IOException e) {
                             throw new CompletionException(
@@ -94,5 +117,32 @@ public class JarDeleteHandler
                     }
                 },
                 executor);
+    }
+
+    void deleteRemoteJarFiles(String fileName) {
+        FileSystem fileSystem = null;
+        try {
+            if (jarRemoteDir != null && !jarRemoteDir.equals("")) {
+                Configuration conf = new Configuration();
+                conf.addResource(new org.apache.hadoop.fs.Path(hadoopConfDir,"core-site.xml"));
+                conf.addResource(new org.apache.hadoop.fs.Path(hadoopConfDir,"hdfs-site.xml"));
+                fileSystem = FileSystem.get(conf);
+                org.apache.hadoop.fs.Path destPath = new org.apache.hadoop.fs.Path(jarRemoteDir, fileName);
+                fileSystem.delete(destPath, false);
+                log.info(String.format("delete %s ok", destPath));
+            } else {
+                log.info("Not support web.upload.remote-dir!");
+            }
+        } catch (Exception ex) {
+            // ignore
+        } finally {
+            if (fileSystem != null) {
+                try {
+                    fileSystem.close();
+                } catch (Exception ex) {
+                    /// ignore
+                }
+            }
+        }
     }
 }

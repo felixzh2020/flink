@@ -31,6 +31,9 @@ import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+
 import javax.annotation.Nonnull;
 
 import java.io.File;
@@ -52,6 +55,8 @@ public class JarUploadHandler
                 RestfulGateway, EmptyRequestBody, JarUploadResponseBody, EmptyMessageParameters> {
 
     private final Path jarDir;
+    private String jarRemoteDir;
+    private String hadoopConfDir;
 
     private final Executor executor;
 
@@ -65,6 +70,23 @@ public class JarUploadHandler
             final Executor executor) {
         super(leaderRetriever, timeout, responseHeaders, messageHeaders);
         this.jarDir = requireNonNull(jarDir);
+        this.executor = requireNonNull(executor);
+    }
+
+    public JarUploadHandler(
+            final GatewayRetriever<? extends RestfulGateway> leaderRetriever,
+            final Time timeout,
+            final Map<String, String> responseHeaders,
+            final MessageHeaders<EmptyRequestBody, JarUploadResponseBody, EmptyMessageParameters>
+                    messageHeaders,
+            final Path jarDir,
+            final String hadoopConfDir,
+            final String jarRemoteDir,
+            final Executor executor) {
+        super(leaderRetriever, timeout, responseHeaders, messageHeaders);
+        this.jarDir = requireNonNull(jarDir);
+        this.hadoopConfDir = hadoopConfDir;
+        this.jarRemoteDir = jarRemoteDir;
         this.executor = requireNonNull(executor);
     }
 
@@ -102,9 +124,38 @@ public class JarUploadHandler
                                             HttpResponseStatus.INTERNAL_SERVER_ERROR,
                                             e));
                         }
+                        uploadRemoteJarFiles(destination);
                         return new JarUploadResponseBody(destination.normalize().toString());
                     }
                 },
                 executor);
+    }
+
+    void uploadRemoteJarFiles(final Path srcFile) {
+        FileSystem fileSystem = null;
+        try {
+            if (jarRemoteDir != null && !jarRemoteDir.equals("")) {
+                Configuration conf = new Configuration();
+                conf.addResource(new org.apache.hadoop.fs.Path(hadoopConfDir, "core-site.xml"));
+                conf.addResource(new org.apache.hadoop.fs.Path(hadoopConfDir, "hdfs-site.xml"));
+                fileSystem = FileSystem.get(conf);
+                org.apache.hadoop.fs.Path srcPath = new org.apache.hadoop.fs.Path(srcFile.toString());
+                org.apache.hadoop.fs.Path destPath = new org.apache.hadoop.fs.Path(jarRemoteDir);
+                fileSystem.copyFromLocalFile(srcPath, destPath);
+                log.info(String.format("upload from %s to %s ok", srcPath, destPath));
+            } else {
+                log.info("Not support web.upload.remote-dir!");
+            }
+        } catch (Exception ex) {
+            // ignore
+        } finally {
+            if (fileSystem != null) {
+                try {
+                    fileSystem.close();
+                } catch (Exception ex) {
+                    /// ignore
+                }
+            }
+        }
     }
 }
