@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -68,7 +69,7 @@ class YarnApplicationFileUploaderTest {
                         ApplicationId.newInstance(0, 0),
                         DFSConfigKeys.DFS_REPLICATION_DEFAULT)) {
 
-            yarnApplicationFileUploader.registerProvidedLocalResources();
+            yarnApplicationFileUploader.registerProvidedLocalResources(LocalResourceVisibility.PUBLIC);
 
             final Set<String> registeredResources =
                     yarnApplicationFileUploader.getRegisteredLocalResources().keySet();
@@ -94,7 +95,7 @@ class YarnApplicationFileUploaderTest {
                         ApplicationId.newInstance(0, 0),
                         DFSConfigKeys.DFS_REPLICATION_DEFAULT)) {
 
-            List<String> classPath = yarnApplicationFileUploader.registerProvidedLocalResources();
+            List<String> classPath = yarnApplicationFileUploader.registerProvidedLocalResources(LocalResourceVisibility.APPLICATION);
             List<String> expectedClassPathEntries = Arrays.asList("conf");
 
             assertThat(classPath).containsExactlyInAnyOrderElementsOf(expectedClassPathEntries);

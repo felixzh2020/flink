@@ -90,6 +90,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
+import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Priority;
@@ -965,7 +966,11 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 
         // Register all files in provided lib dirs as local resources with public visibility
         // and upload the remaining dependencies as local resources with APPLICATION visibility.
-        final List<String> systemClassPaths = fileUploader.registerProvidedLocalResources();
+        String visibilityStr = flinkConfiguration.getString("yarn.provided.lib.local-resource-visibility", "PUBLIC");
+        LocalResourceVisibility visibility = visibilityStr.equals("PUBLIC") ? LocalResourceVisibility.PUBLIC :
+                visibilityStr.equals("APPLICATION") ? LocalResourceVisibility.APPLICATION :
+                        visibilityStr.equals("PRIVATE") ? LocalResourceVisibility.PRIVATE : null;
+        final List<String> systemClassPaths = fileUploader.registerProvidedLocalResources(visibility);
         final List<String> uploadedDependencies =
                 fileUploader.registerMultipleLocalResources(
                         systemShipFiles, Path.CUR_DIR, LocalResourceType.FILE);

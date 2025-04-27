@@ -341,7 +341,7 @@ class YarnApplicationFileUploader implements AutoCloseable {
      *
      * @return list of class paths with the file name
      */
-    List<String> registerProvidedLocalResources() {
+    List<String> registerProvidedLocalResources(LocalResourceVisibility visibility) {
         checkNotNull(localResources);
 
         final ArrayList<String> classPaths = new ArrayList<>();
@@ -356,7 +356,7 @@ class YarnApplicationFileUploader implements AutoCloseable {
                             YarnLocalResourceDescriptor.fromFileStatus(
                                     fileName,
                                     fileStatus,
-                                    LocalResourceVisibility.PUBLIC,
+                                    visibility,
                                     LocalResourceType.FILE);
                     localResources.put(fileName, descriptor.toLocalResource());
                     remotePaths.add(filePath);
